@@ -11,10 +11,14 @@ const app = express();
 app.use(express.json());
 // const cors = require('cors');
 
-app.use(cors({
-  origin: 'http://localhost:5173', // Replace with your frontend URL
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: "*",
+    methods: "GET,POST,PUT,DELETE",
+    credentials: true,
+  })
+);
+
 
 
 
