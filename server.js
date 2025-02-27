@@ -23,10 +23,10 @@ app.use(
 
 
 const pool = mysql.createPool({
-  host: '103.21.58.5',
-  user: 'stepcone2024',
-  password: 'Curie@1867',
-  database: 'stepcone',
+  host: 'localhost',
+  user: 'root',
+  password: 'SIH@1642',
+  database: 'medicine_tracker',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
@@ -41,21 +41,22 @@ const TWILIO_PHONE_NUMBER = "+19782051991";
 let activeCronJobs = {}; // Stores all active cron jobs
 
 //fn to send sms
-const sendSMS = async (to, message) => {
+const sendSMS = async (numbers, message) => {
   try {
-    console.log(`Attempting to send SMS to +91${to}: ${message}`);
-    const result = await twilioClient.messages.create({
-      body: message,
-      from: '+19782051991', // Replace with your Twilio phone number
-      to: `+91${to}` // Prepend +91 to the 10-digit mobile number
-    });
-    console.log(`SMS sent successfully to +91${to}. Message SID: ${result.sid}`);
+    for (const number of numbers) {
+      console.log(`Attempting to send SMS to +91${number}: ${message}`);
+      const result = await twilioClient.messages.create({
+        body: message,
+        from: TWILIO_PHONE_NUMBER,
+        to: `+91${number}` // Prepend +91 to the 10-digit mobile number
+      });
+      console.log(`SMS sent successfully to +91${number}. Message SID: ${result.sid}`);
+    }
   } catch (error) {
     console.error('Error sending SMS:', error);
   }
 };
 
-//reload schedules
 const reloadSchedules = async () => {
   // Clear existing cron jobs
   for (const job of Object.values(activeCronJobs)) {
@@ -72,13 +73,19 @@ const reloadSchedules = async () => {
       [medication.id]
     );
 
-    const [user] = await pool.query('SELECT mobile FROM users1 WHERE id = ?', [medication.user_id]);
+    const [user] = await pool.query('SELECT mobile, family_member_number FROM users WHERE id = ?', [medication.user_id]);
 
     if (user.length > 0 && user[0].mobile && schedules.length > 0) {
       const mobile = user[0].mobile;
+      const familyMemberNumber = user[0].family_member_number;
       const medicationName = medication.name;
 
       if (/^\d{10}$/.test(mobile)) {
+        const numbersToNotify = [mobile];
+        if (familyMemberNumber && /^\d{10}$/.test(familyMemberNumber)) {
+          numbersToNotify.push(familyMemberNumber);
+        }
+
         schedules.forEach(schedule => {
           const [hour, minute] = schedule.exact_time.split(':');
           const cronExpression = `${minute} ${hour} * * *`;
@@ -88,7 +95,7 @@ const reloadSchedules = async () => {
             () => {
               console.log(`Triggering reminder for medication "${medicationName}" at ${hour}:${minute}`);
               const message = `Reminder: Take your medication "${medicationName}" now.`;
-              sendSMS(mobile, message);
+              sendSMS(numbersToNotify, message);
             },
             {
               timezone: 'Asia/Kolkata', // Set to Indian timezone
@@ -117,13 +124,19 @@ const scheduleMedicationReminders = async () => {
         [medication.id]
       );
 
-      const [user] = await pool.query('SELECT mobile FROM users1 WHERE id = ?', [medication.user_id]);
+      const [user] = await pool.query('SELECT mobile, family_member_number FROM users WHERE id = ?', [medication.user_id]);
 
       if (user.length > 0 && user[0].mobile && schedules.length > 0) {
         const mobile = user[0].mobile;
+        const familyMemberNumber = user[0].family_member_number;
         const medicationName = medication.name;
 
         if (/^\d{10}$/.test(mobile)) {
+          const numbersToNotify = [mobile];
+          if (familyMemberNumber && /^\d{10}$/.test(familyMemberNumber)) {
+            numbersToNotify.push(familyMemberNumber);
+          }
+
           schedules.forEach(schedule => {
             const [hour, minute] = schedule.exact_time.split(':');
             const cronExpression = `${minute} ${hour} * * *`;
@@ -134,7 +147,7 @@ const scheduleMedicationReminders = async () => {
               () => {
                 console.log(`Triggering reminder for medication "${medicationName}" at ${hour}:${minute}`);
                 const message = `Reminder: Take your medication "${medicationName}" now.`;
-                sendSMS(mobile, message);
+                sendSMS(numbersToNotify, message);
               },
               {
                 timezone: 'Asia/Kolkata', // Set to Indian timezone
@@ -156,23 +169,6 @@ const scheduleMedicationReminders = async () => {
 // Start scheduling reminders when the server starts
 scheduleMedicationReminders();
 
-
-//emergency api
-app.get("/userem/:userId", async (req, res) => {
-  const { userId } = req.params;
-
-  try {
-    const [user] = await pool.query("SELECT fullname, family_doctor_number FROM users1 WHERE id = ?", [userId]);
-    if (user.length > 0) {
-      res.status(200).json({ fullname: user[0].fullname, familyDoctorNumber: user[0].family_doctor_number });
-    } else {
-      res.status(404).json({ error: "User not found" });
-    }
-  } catch (error) {
-    console.error("Error fetching user data:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
 
 app.get('/medications/:userId', async (req, res) => {
   const { userId } = req.params;
@@ -332,14 +328,14 @@ app.post("/signup", async (req, res) => {
   const { mobile,fullname, email, password } = req.body;
 
   try {
-    const [existingUser] = await pool.query("SELECT * FROM users1 WHERE email = ?", [email]);
+    const [existingUser] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
 
     if (existingUser.length > 0) {
       return res.status(400).json({ error: "User already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await pool.query("INSERT INTO users1 (fullname, email, password,mobile) VALUES (?, ?, ?,?)", [
+    await pool.query("INSERT INTO users (fullname, email, password,mobile) VALUES (?, ?, ?,?)", [
       fullname,
       email,
       hashedPassword,
@@ -361,7 +357,7 @@ app.post('/signin', async (req, res) => {
   }
 
   try {
-    const [users] = await pool.query('SELECT * FROM users1 WHERE email = ?', [email]);
+    const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
     if (users.length > 0) {
       const user = users[0];
       const validPassword = await bcrypt.compare(password, user.password);
@@ -393,16 +389,16 @@ app.post('/google-auth', async (req, res) => {
     const payload = ticket.getPayload();
     const { email, name } = payload;
 
-    const [existingUser] = await pool.query("SELECT * FROM users1 WHERE email = ?", [email]);
+    const [existingUser] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
 
     if (existingUser.length > 0) {
         const token = jwt.sign({ userId: existingUser[0].id }, 'yourSecretKey', { expiresIn: '1h' });
         return res.send({ token, userId: existingUser[0].id });
       }
 
-    await pool.query("INSERT INTO users1 (fullname, email) VALUES (?, ?)", [name, email]);
+    await pool.query("INSERT INTO users (fullname, email) VALUES (?, ?)", [name, email]);
 
-    const [newUser] = await pool.query("SELECT * FROM users1 WHERE email = ?", [email]);
+    const [newUser] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
     const newToken = jwt.sign({ userId: newUser[0].id }, 'yourSecretKey', { expiresIn: '1h' });
 
     res.send({ token: newToken, userId: newUser[0].id });
@@ -412,11 +408,28 @@ app.post('/google-auth', async (req, res) => {
   }
 });
 
+//emergency api
+app.get("/userem/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const [user] = await pool.query("SELECT fullname, family_doctor_number FROM users WHERE id = ?", [userId]);
+    if (user.length > 0) {
+      res.status(200).json({ fullname: user[0].fullname, familyDoctorNumber: user[0].family_doctor_number });
+    } else {
+      res.status(404).json({ error: "User not found" });
+    }
+  } catch (error) {
+    console.error("Error fetching user data:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 app.get("/user/:userId", async (req, res) => {
   const { userId } = req.params;
 
   try {
-    const [user] = await pool.query("SELECT fullname FROM users1 WHERE id = ?", [userId]);
+    const [user] = await pool.query("SELECT fullname FROM users WHERE id = ?", [userId]);
     if (user.length > 0) {
       res.status(200).json({ fullname: user[0].fullname });
     } else {
@@ -436,7 +449,29 @@ app.get("/user/:userId", async (req, res) => {
 //   });
 // });
 
+//family and doctor no. api
+// Endpoint to save contacts
+// API Route
+app.post('/api/save-contacts', (req, res) => {
+  const { familyDoctor, familyMember, userId } = req.body;
 
+  if (!familyDoctor || !familyMember || !userId) {
+    return res.status(400).json({ message: "Missing required fields" });
+  }
+
+  const updateQuery = `
+    UPDATE users 
+    SET family_doctor_number = ?, family_member_number = ?
+    WHERE id = ?
+  `;
+
+  db.query(updateQuery, [familyDoctor, familyMember, userId], (err, result) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.status(200).json({ message: 'Contacts saved successfully' });
+  });
+});
 
 app.listen(3000, () => {
   console.log('Server running on port 3000');
