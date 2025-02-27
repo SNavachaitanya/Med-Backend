@@ -156,6 +156,24 @@ const scheduleMedicationReminders = async () => {
 // Start scheduling reminders when the server starts
 scheduleMedicationReminders();
 
+
+//emergency api
+app.get("/userem/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const [user] = await pool.query("SELECT fullname, family_doctor_number FROM users1 WHERE id = ?", [userId]);
+    if (user.length > 0) {
+      res.status(200).json({ fullname: user[0].fullname, familyDoctorNumber: user[0].family_doctor_number });
+    } else {
+      res.status(404).json({ error: "User not found" });
+    }
+  } catch (error) {
+    console.error("Error fetching user data:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 app.get('/medications/:userId', async (req, res) => {
   const { userId } = req.params;
 
