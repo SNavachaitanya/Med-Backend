@@ -23,10 +23,10 @@ app.use(
 
 
 const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: 'SIH@1642',
-  database: 'medicine_tracker',
+  host: '103.21.58.5',
+  user: 'stepcone2024',
+  password: 'Curie@1867',
+  database: 'stepcone',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
@@ -73,7 +73,7 @@ const reloadSchedules = async () => {
       [medication.id]
     );
 
-    const [user] = await pool.query('SELECT mobile, family_member_number FROM users WHERE id = ?', [medication.user_id]);
+    const [user] = await pool.query('SELECT mobile, family_member_number FROM users1 WHERE id = ?', [medication.user_id]);
 
     if (user.length > 0 && user[0].mobile && schedules.length > 0) {
       const mobile = user[0].mobile;
@@ -124,7 +124,7 @@ const scheduleMedicationReminders = async () => {
         [medication.id]
       );
 
-      const [user] = await pool.query('SELECT mobile, family_member_number FROM users WHERE id = ?', [medication.user_id]);
+      const [user] = await pool.query('SELECT mobile, family_member_number FROM users1 WHERE id = ?', [medication.user_id]);
 
       if (user.length > 0 && user[0].mobile && schedules.length > 0) {
         const mobile = user[0].mobile;
@@ -328,14 +328,14 @@ app.post("/signup", async (req, res) => {
   const { mobile,fullname, email, password } = req.body;
 
   try {
-    const [existingUser] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
+    const [existingUser] = await pool.query("SELECT * FROM users1 WHERE email = ?", [email]);
 
     if (existingUser.length > 0) {
       return res.status(400).json({ error: "User already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await pool.query("INSERT INTO users (fullname, email, password,mobile) VALUES (?, ?, ?,?)", [
+    await pool.query("INSERT INTO users1 (fullname, email, password,mobile) VALUES (?, ?, ?,?)", [
       fullname,
       email,
       hashedPassword,
@@ -357,7 +357,7 @@ app.post('/signin', async (req, res) => {
   }
 
   try {
-    const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+    const [users] = await pool.query('SELECT * FROM users1 WHERE email = ?', [email]);
     if (users.length > 0) {
       const user = users[0];
       const validPassword = await bcrypt.compare(password, user.password);
@@ -389,16 +389,16 @@ app.post('/google-auth', async (req, res) => {
     const payload = ticket.getPayload();
     const { email, name } = payload;
 
-    const [existingUser] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
+    const [existingUser] = await pool.query("SELECT * FROM users1 WHERE email = ?", [email]);
 
     if (existingUser.length > 0) {
         const token = jwt.sign({ userId: existingUser[0].id }, 'yourSecretKey', { expiresIn: '1h' });
         return res.send({ token, userId: existingUser[0].id });
       }
 
-    await pool.query("INSERT INTO users (fullname, email) VALUES (?, ?)", [name, email]);
+    await pool.query("INSERT INTO users1 (fullname, email) VALUES (?, ?)", [name, email]);
 
-    const [newUser] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
+    const [newUser] = await pool.query("SELECT * FROM users1 WHERE email = ?", [email]);
     const newToken = jwt.sign({ userId: newUser[0].id }, 'yourSecretKey', { expiresIn: '1h' });
 
     res.send({ token: newToken, userId: newUser[0].id });
@@ -413,7 +413,7 @@ app.get("/userem/:userId", async (req, res) => {
   const { userId } = req.params;
 
   try {
-    const [user] = await pool.query("SELECT fullname, family_doctor_number FROM users WHERE id = ?", [userId]);
+    const [user] = await pool.query("SELECT fullname, family_doctor_number FROM users1 WHERE id = ?", [userId]);
     if (user.length > 0) {
       res.status(200).json({ fullname: user[0].fullname, familyDoctorNumber: user[0].family_doctor_number });
     } else {
@@ -429,7 +429,7 @@ app.get("/user/:userId", async (req, res) => {
   const { userId } = req.params;
 
   try {
-    const [user] = await pool.query("SELECT fullname FROM users WHERE id = ?", [userId]);
+    const [user] = await pool.query("SELECT fullname FROM users1 WHERE id = ?", [userId]);
     if (user.length > 0) {
       res.status(200).json({ fullname: user[0].fullname });
     } else {
@@ -460,7 +460,7 @@ app.post('/api/save-contacts', (req, res) => {
   }
 
   const updateQuery = `
-    UPDATE users 
+    UPDATE users1 
     SET family_doctor_number = ?, family_member_number = ?
     WHERE id = ?
   `;
