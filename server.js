@@ -35,7 +35,7 @@ const pool = mysql.createPool({
 const client = new OAuth2Client("342329070589-db41eq9jsjcsk3u0tab4jfbe56q4msp5.apps.googleusercontent.com");
 
 // Twilio Credentials
-const twilioClient = twilio("AC663e91fa7a61c76f19edac1701ca308f", "673f49c1596bfad48e68bde7144909bf");
+const twilioClient = twilio("AC663e91fa7a61c76f19edac1701ca308f", "14ab6db3762c9ff7c64708307b515de9");
 const TWILIO_PHONE_NUMBER = "+19782051991";
 
 let activeCronJobs = {}; // Stores all active cron jobs
